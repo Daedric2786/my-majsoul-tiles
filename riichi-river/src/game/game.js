@@ -10,12 +10,12 @@ import { STATIONS, endlessStation, CHARMS, CHARM_BY_ID, modsFromCharms, MAX_CHAR
 import { makeRng } from './rng.js';
 
 export const RIVER = {
-  halfWidth: 3.0, // tiles stay within [-halfWidth, halfWidth]
-  zSpawn: -15.5,
-  zLose: 2.4,
-  mistZ: -5.6,
-  rapidsZ: [-9.5, -4.0],
-  eddy: { x: 0.9, z: -8.2, r: 1.55 },
+  halfWidth: 2.35, // tiles stay within [-halfWidth, halfWidth]
+  zSpawn: -13.8,
+  zLose: 2.2,
+  mistZ: -5.0,
+  rapidsZ: [-8.5, -3.6],
+  eddy: { x: 0.6, z: -7.4, r: 1.3 },
 };
 
 const START_LIVES = 3;
@@ -295,7 +295,7 @@ export class Game {
     let x;
     for (let tries = 0; tries < 6; tries++) {
       x = st.rng.range(-H, H);
-      if (Math.abs(x - st.lastX) > 1.2) break;
+      if (Math.abs(x - st.lastX) > 1.0) break;
     }
     st.lastX = x;
     if (second && tile.kind > second.kind) [tile, second] = [second, tile];

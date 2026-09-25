@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1a2a" />
+    <meta name="description" content="Riichi River — catch mahjong tiles from a lantern-lit river, build hands, and wait for the one tile that wins." />
+    <title>Riichi River</title>
+    <link rel="preload" href="./fonts/rr-mincho.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/rr-round-black.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="gl" aria-label="Riichi River game"></canvas>
+    <div id="vignette"></div>
+    <div id="ui">
+      <div id="hud" class="hidden">
+        <div class="hud-top">
+          <div class="hud-station">
+            <div class="seal" id="hud-seal">源流</div>
+            <div class="hud-station-text">
+              <div class="hud-station-name" id="hud-name"></div>
+              <div class="hud-wind" id="hud-wind"></div>
+            </div>
+          </div>
+          <div class="hud-score">
+            <div class="hud-score-nums"><span id="hud-score">0</span><span class="slash">/</span><span id="hud-target">0</span></div>
+            <div class="bar"><div class="bar-fill" id="hud-bar"></div><div class="bar-shine"></div></div>
+          </div>
+          <button class="icon-btn" id="btn-pause" aria-label="Pause"><span></span><span></span></button>
+        </div>
+        <div class="hud-sub">
+          <div class="hud-dora"><span class="lbl" id="lbl-dora">Dora</span><div id="hud-dora-tiles"></div></div>
+          <div class="hud-bless hidden" id="hud-bless"></div>
+          <div class="hud-right">
+            <div class="hud-lives" id="hud-lives"></div>
+            <div class="hud-wall"><span id="hud-wall">0</span><span class="lbl" id="lbl-left">tiles left</span></div>
+          </div>
+        </div>
+        <div class="wall-meter"><div id="wall-meter-fill"></div></div>
+      </div>
+      <button id="btn-riichi" class="riichi hidden" aria-label="Riichi">
+        <span class="riichi-kanji">立直</span><span class="riichi-label" id="riichi-label">RIICHI</span>
+      </button>
+      <div id="waits" class="waits hidden"></div>
+      <div id="toast" class="toast"></div>
+      <div id="stamps"></div>
+      <div id="tutorial" class="tutorial hidden"></div>
+      <div id="screens"></div>
+    </div>
+    <div id="boot"><div class="boot-seal">立直</div><div class="boot-text" id="boot-text">Filling the river…</div></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
