@@ -34,7 +34,7 @@ export class Game {
   emit(type, data = {}) { this.onEvent(type, data); }
 
   // ------------------------------------------------------------------ run
-  newRun({ seed = (Math.random() * 2 ** 32) >>> 0, daily = false, charms = [] } = {}) {
+  newRun({ seed = (Math.random() * 2 ** 32) >>> 0, daily = false, charms = [], resume = null } = {}) {
     this.run = {
       seed, daily,
       rng: makeRng(seed),
@@ -49,6 +49,7 @@ export class Game {
       yakuSeen: {},
       stats: { catches: 0, discards: 0, riichi: 0, wins: 0, limits: 0 },
     };
+    if (resume) Object.assign(this.run, resume);
     this.refreshMods();
     this.startStation();
   }
@@ -345,7 +346,7 @@ export class Game {
     let res = resolveCatch(st.hand, f.tile, { riichi: !!st.riichi });
     let released = null;
     if (!res.ok && res.reason === 'full' && this.mods.autoRelease) {
-      released = this.pickRelease();
+      released = this.pickRelease(f.tile);
       discardTile(st.hand, released.id);
       res = resolveCatch(st.hand, f.tile, { riichi: false });
     }
@@ -407,7 +408,6 @@ export class Game {
     if (!plan) return reject('full');
     f.state = 'caught';
     st.floats = st.floats.filter((g) => g !== f);
-    this.run.stats.catches += 2;
     // replay on the real hand
     let winEv = false;
     const all = [];
@@ -415,9 +415,12 @@ export class Game {
       if (winEv) break;
       const r = resolveCatch(st.hand, t, { riichi: !!st.riichi });
       all.push({ tile: t, result: r });
+      this.run.stats.catches++;
       if (r.action === 'win') winEv = true;
     }
-    this.emit('catch', { float: f, tile: f.tile, raft: all });
+    // a tile left over after the raft's first tile won drifts back into the river
+    const leftover = f.tiles.filter((t) => !all.some((a) => a.tile === t));
+    this.emit('catch', { float: f, tile: f.tile, raft: all, leftover });
     for (const { result } of all) {
       for (const e of result.events) {
         if (e.type === 'kan') {
@@ -433,12 +436,13 @@ export class Game {
     return { ok: true, action: winEv ? 'win' : 'raft' };
   }
 
-  pickRelease() {
+  pickRelease(incoming) {
     const tray = this.st.hand.tray;
     let best = tray[0], bestV = -Infinity;
     const need = MELDS_TO_WIN - this.st.hand.melds.length;
     for (const t of tray) {
       const rest = tray.filter((x) => x !== t).map((x) => x.kind);
+      if (incoming) rest.push(incoming.kind);
       const v = trayValue(rest, need);
       if (v > bestV) { bestV = v; best = t; }
     }
@@ -575,7 +579,7 @@ export class Game {
   canTakeCharm(id) {
     const c = CHARM_BY_ID[id];
     if (!c) return false;
-    if (c.instant) return true;
+    if (c.instant) return this.run.lives < 5;
     return this.run.charms.length < MAX_CHARMS && !this.run.charms.includes(id);
   }
 

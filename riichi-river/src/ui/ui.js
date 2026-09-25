@@ -44,7 +44,7 @@ export class UI {
     $('hud-seal').textContent = def.kanji;
     $('hud-name').textContent = name;
     const w = tr().winds[def.wind - 27];
-    $('hud-wind').textContent = `${t('wind')}: ${w}  ·  ${index + 1}/8`;
+    $('hud-wind').textContent = `${t('wind')}: ${w}  ·  ${def.id === 'endless' ? '∞' : `${index + 1}/8`}`;
     $('lbl-dora').textContent = t('dora');
     $('lbl-left').textContent = t('tilesLeft');
     $('riichi-label').textContent = t('riichi').toUpperCase();

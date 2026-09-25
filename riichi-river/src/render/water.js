@@ -80,7 +80,7 @@ void main() {
   float amp = 0.55;
   // rapids roughen the surface
   float rap = uRapids.z * smoothstep(uRapids.x - 0.8, uRapids.x + 0.4, p.y) * (1.0 - smoothstep(uRapids.y - 0.4, uRapids.y + 0.8, p.y));
-  amp += rap * 0.9;
+  amp += rap * 0.5;
   vec3 N = normalize(vec3(-(hx - h0) / e * amp * 0.35, 1.0, -(hz - h0) / e * amp * 0.35));
 
   // ------------- tiles: contact shadow, wake, ripples, glimmer
@@ -172,8 +172,9 @@ void main() {
   float gate = smoothstep(0.35, 0.75, fbm(vec2(p.x * 1.3, (p.y - uFlow) * 0.5)));
   float lines = smoothstep(0.8, 0.92, n1) * gate * 0.4;
   float bankFoam = exp(-pow(edge * 5.0, 2.0)) * (0.35 + 0.65 * noise(vec2(p.x * 6.0, (p.y - uFlow) * 2.5)));
-  float rapFoam = rap * smoothstep(0.5, 0.85, noise(vec2(p.x * 3.5, (p.y - uFlow * 1.7) * 1.3)));
-  foamT += lines + bankFoam * 0.7 + rapFoam * 0.9;
+  // rapids: thin fast streaks (kept thin so ivory tiles stay readable on top of them)
+  float rapFoam = rap * smoothstep(0.8, 0.92, noise(vec2(p.x * 6.0, (p.y - uFlow * 1.8) * 0.6)));
+  foamT += lines + bankFoam * 0.7 + rapFoam * 0.55;
   col = mix(col, uFoam, clamp(foamT, 0.0, 1.0) * 0.6);
   col += glimmer;
 

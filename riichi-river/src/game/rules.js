@@ -164,6 +164,20 @@ export function resolveCatch(hand, tile, ctx = {}) {
     return { ok: true, action: 'win', events };
   }
 
+  // 1b) A meld that completes the hand always wins over a kan upgrade
+  if (hand.melds.length < MELDS_TO_WIN) {
+    for (const o of meldOptions(hand.tray, tile)) {
+      const h2 = cloneHand(hand);
+      applyMeld(h2, o);
+      if (isComplete(h2)) {
+        applyMeld(hand, o);
+        events.push({ type: 'meld', meldIndex: hand.melds.length - 1, meldType: o.type, tiles: o.tiles, caught: tile });
+        events.push({ type: 'win' });
+        return { ok: true, action: 'win', events };
+      }
+    }
+  }
+
   // 2) Upgrade a pon to kan
   const ponIdx = hand.melds.findIndex((m) => m.type === 'pon' && m.tiles[0].kind === k);
   if (ponIdx >= 0 && !ctx.riichi && !ctx.noKan) {

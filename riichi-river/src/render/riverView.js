@@ -110,7 +110,7 @@ export class RiverView {
 
   setHints(useful, waits, riichi, hintsOn, noGlow) {
     this.hintKinds = new Map();
-    if (hintsOn) for (const [k, a] of useful) this.hintKinds.set(k, a === 'win' ? 'win' : 'meld');
+    if (hintsOn) for (const [k, a] of useful) { if (a === 'win' && noGlow) continue; this.hintKinds.set(k, a === 'win' ? 'win' : 'meld'); }
     if (!noGlow) for (const k of waits) if (riichi || hintsOn) this.hintKinds.set(k, 'win');
     if (riichi && !noGlow) {
       this.hintKinds = new Map(waits.map((k) => [k, 'win']));

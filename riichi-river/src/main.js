@@ -113,12 +113,18 @@ function positionOverlays() {
   if (!L) return;
   const bottom = H - L.top + 18;
   ui.setRiichiButton(game && mode === 'play' && game.canRiichi() && !paused, bottom);
-  if (game && game.st) ui.setWaits(game.st.riichi ? game.st.riichi.waits : null, bottom, !!game.st.riichi);
+  const showWaits = game && game.st && mode === 'play' && game.phase === 'play' && game.st.riichi && !game.mods.riichiNoGlow;
+  ui.setWaits(showWaits ? game.st.riichi.waits : null, bottom, !!showWaits);
 }
 
 // ------------------------------------------------------------------ ambient title river
 function startAmbient() {
   mode = 'title';
+  document.body.classList.remove('in-riichi');
+  ui.tutorial(null);
+  tut = null;
+  ui.setRiichiButton(false, 0);
+  ui.setWaits(null, 0, false);
   river.clear();
   hand.clearAll();
   game = new Game({ onEvent: onAmbientEvent });
@@ -183,15 +189,13 @@ function startRun({ daily = false, resume = null }) {
   tut = tutorial ? { step: 0, t: 0 } : null;
   let seed = daily ? dailySeed() : QS.get('seed') ? Number(QS.get('seed')) : (Math.random() * 2 ** 32) >>> 0;
   if (resume) seed = hashString(`${resume.seed}:${resume.stationIndex}:${resume.total}`);
-  game.newRun({ seed, daily, charms: resume ? resume.charms : [] });
-  if (resume) {
-    Object.assign(game.run, {
+  game.newRun({
+    seed, daily, charms: resume ? resume.charms : [],
+    resume: resume ? {
       stationIndex: resume.stationIndex, lives: resume.lives, coins: resume.coins, total: resume.total,
       hands: resume.hands, best: resume.best, daily: resume.daily, victoryShown: resume.victoryShown,
-    });
-    game.refreshMods();
-    game.startStation();
-  }
+    } : null,
+  });
   if (QS.get('station') && !resume) { game.run.stationIndex = Number(QS.get('station')); game.startStation(); } // debug: jump to a river
   S.runs++;
   S.run = null;
@@ -363,7 +367,7 @@ function onEvent(type, d) {
       ui.setBlessing(d.blessing);
       break;
     }
-    case 'win': onWin(d); break;
+    case 'win': onWin(d); positionOverlays(); break;
     case 'handReset': {
       // tiles in the rack sink away
       for (const [id] of hand.tiles) {
@@ -376,11 +380,13 @@ function onEvent(type, d) {
       ui.setScore(d.score, d.target);
       ui.setBlessing(0);
       audio.setMusicState('play');
+      positionOverlays();
       break;
     }
     case 'stationClear': {
       audio.play('clear', { vol: 1 });
       audio.setMusicState('shrine', 2);
+      positionOverlays();
       S.tutorialDone = true;
       if (tut) { ui.tutorial(null); tut = null; }
       mergeYaku(game.run.yakuSeen); game.run.yakuSeen = {};
@@ -394,7 +400,8 @@ function onEvent(type, d) {
       ui.setLives(game.run.lives);
       platform.gameplayStop();
       mergeYaku(game.run.yakuSeen); game.run.yakuSeen = {};
-      persist();
+      if (d.over) { S.run = null; persist(); } else snapshotRun();
+      positionOverlays();
       later(() => ui.stationFail({
         ...d,
         onRetry: () => { ui.clearScreens(); platform.commercialBreak(audio).then(() => { platform.gameplayStart(); game.retryStation(); }); },
@@ -416,7 +423,11 @@ function onCatch(d) {
   if (!it) return;
   if (f.tiles.length > 1) {
     const tiles = it.group.userData.raftTiles;
-    f.tiles.forEach((tile, i) => hand.flyIn(tile, tiles[i], i * 0.06));
+    const caught = new Set((d.raft || []).map((r) => r.tile));
+    f.tiles.forEach((tile, i) => {
+      if (caught.has(tile)) hand.flyIn(tile, tiles[i], i * 0.06);
+      else { tiles[i].parent?.remove(tiles[i]); river.addDrifter(tiles[i], f.x, f.z); }
+    });
     river.group.add(it.group); // the empty raft keeps floating a moment
     it.group.userData.raftTiles = [];
     later(() => river.group.remove(it.group), 400);
@@ -462,13 +473,14 @@ function kindName(k) {
 function showShrine() {
   platform.gameplayStop();
   const run = game.run;
-  const offers = game.shrineOffers().map((id, i) => ({ id, cost: i === 0 && !run.freeTaken ? 0 : CHARM_BY_ID[id].cost, taken: false }));
+  const offers = game.shrineOffers().map((id) => ({ id, cost: 0, taken: false }));
   let freeLeft = true;
   const rerollCost = 3;
   const render = () => ui.shrine({
     run, offers, rerollCost,
     onTake: (i) => {
       const o = offers[i];
+      if (o.taken) return;
       const cost = freeLeft ? 0 : CHARM_BY_ID[o.id].cost;
       if (!game.canTakeCharm(o.id)) { toastOnce('full', t('full')); audio.play('thud'); return; }
       if (run.coins < cost) { audio.play('thud'); return; }
@@ -484,7 +496,6 @@ function showShrine() {
       run.coins -= rerollCost;
       const ids = game.shrineOffers();
       offers.splice(0, 3, ...ids.map((id) => ({ id, cost: freeLeft ? 0 : CHARM_BY_ID[id].cost, taken: false })));
-      if (freeLeft) offers.forEach((o, i) => { o.cost = i === 0 ? 0 : CHARM_BY_ID[o.id].cost; });
       audio.play('ui');
       render();
     },
@@ -497,10 +508,7 @@ function showShrine() {
       });
     },
   });
-  // First offer is free: mark visually
-  offers.forEach((o, i) => { o.cost = i === 0 ? 0 : CHARM_BY_ID[o.id].cost; });
-  // any card can be the free one: show costs as 0 until one is taken
-  offers.forEach((o) => { o.cost = 0; });
+  // any card can be the free offering: all show "Free" until one is taken
   render();
 }
 
@@ -549,6 +557,7 @@ function resume() {
 }
 function snapshotIfMidRun() {
   // Leaving mid-river forfeits the river but keeps the journey (charms, lives -1).
+  if (game && game.run && game.run.lives - 1 <= 0) { S.run = null; persist(); return; }
   if (game && game.run && game.run.lives > 0) {
     const r = game.run;
     S.run = { seed: r.seed, stationIndex: r.stationIndex, lives: Math.max(1, r.lives - 1), coins: r.coins, charms: r.charms.slice(), total: r.total, hands: r.hands, best: r.best, daily: r.daily, victoryShown: !!r.victoryShown };
@@ -713,4 +722,9 @@ window.__rr = {
   advance: (n = 1) => { for (let i = 0; i < n; i++) frame(0); },
 };
 
-boot();
+boot().catch((e) => {
+  console.error('Boot failed', e);
+  const b = document.getElementById('boot');
+  b.classList.remove('gone');
+  document.getElementById('boot-text').textContent = 'Something went wrong while starting. Please reload the page.';
+});

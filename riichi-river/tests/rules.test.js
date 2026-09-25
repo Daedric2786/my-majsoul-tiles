@@ -182,3 +182,9 @@ test('dora indicator wraps', () => {
   assert.equal(doraFromIndicator(parseKinds('N')[0]), parseKinds('E')[0]);
   assert.equal(doraFromIndicator(parseKinds('R')[0]), parseKinds('Wh')[0]);
 });
+
+test('a catch that completes the hand wins instead of upgrading a pon to kan', () => {
+  const h = handFrom(['111m', '456p', '789s'], '2m 3m 5s 5s');
+  assert.ok(winningKinds(h).includes(parseKinds('1m')[0]));
+  assert.equal(resolveCatch(h, tile('1m')).action, 'win');
+});

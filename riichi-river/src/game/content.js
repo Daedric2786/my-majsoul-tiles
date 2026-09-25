@@ -13,7 +13,7 @@ export const STATIONS = [
   {
     id: 'bamboo', kanji: '竹林', wind: 27,
     kinds: [...KINDS_SOU, ...KINDS_PIN, ...DRAGON_KINDS],
-    wall: 78, speed: 1.5, spacing: 0.94, target: 12000, kindness: 0.2,
+    wall: 78, speed: 1.5, spacing: 0.94, target: 12000, kindness: 0.2, rafts: 0.1,
     features: ['gusts'], palette: 'bamboo',
   },
   {
@@ -25,7 +25,7 @@ export const STATIONS = [
   {
     id: 'festival', kanji: '祭', wind: 28,
     kinds: [...KINDS_MAN, ...KINDS_SOU, ...WIND_KINDS, ...DRAGON_KINDS],
-    wall: 90, speed: 1.65, spacing: 0.88, target: 20000, kindness: 0.1, redFives: 1,
+    wall: 90, speed: 1.65, spacing: 0.88, target: 20000, kindness: 0.1, redFives: 1, rafts: 0.12,
     features: ['lanterns'], palette: 'festival',
   },
   {
@@ -37,19 +37,19 @@ export const STATIONS = [
   {
     id: 'mist', kanji: '霧', wind: 29,
     kinds: [...KINDS_MAN, ...KINDS_PIN, ...KINDS_SOU, ...WIND_KINDS, ...DRAGON_KINDS],
-    wall: 100, speed: 1.7, spacing: 0.85, target: 18000, kindness: 0.05, redFives: 1,
+    wall: 100, speed: 1.7, spacing: 0.85, target: 14000, kindness: 0.05, redFives: 1,
     features: ['mist', 'eddy'], palette: 'mist',
   },
   {
     id: 'falls', kanji: '滝', wind: 30,
     kinds: [...KINDS_MAN, ...KINDS_PIN, ...KINDS_SOU, ...WIND_KINDS, ...DRAGON_KINDS],
-    wall: 104, speed: 1.85, spacing: 0.84, target: 22000, kindness: 0.04, redFives: 1,
+    wall: 104, speed: 1.85, spacing: 0.84, target: 18000, kindness: 0.04, redFives: 1, rafts: 0.12,
     features: ['rapids', 'gusts', 'koi'], palette: 'falls',
   },
   {
     id: 'sea', kanji: '暁の海', wind: 30,
     kinds: [...KINDS_MAN, ...KINDS_PIN, ...KINDS_SOU, ...WIND_KINDS, ...DRAGON_KINDS],
-    wall: 110, speed: 1.9, spacing: 0.84, target: 30000, kindness: 0.03, redFives: 1,
+    wall: 110, speed: 1.9, spacing: 0.84, target: 26000, kindness: 0.03, redFives: 1, rafts: 0.12,
     features: ['mist', 'koi', 'lanterns', 'eddy'], palette: 'dawn',
   },
 ];
