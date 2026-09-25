@@ -1,6 +1,7 @@
 // Sky dome, distant mountains and riverbank props. All procedural, palette-driven.
 import * as THREE from 'three';
 import { RIVER } from '../game/game.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const rand = (() => { let a = 9127; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; })();
 
@@ -165,33 +166,35 @@ export class Scenery {
     }
     this.group.add(this.reeds);
 
-    // stone lanterns (toro) with warm windows
+    // stone lanterns (toro) with warm windows: merged into two meshes for few draw calls
     this.toro = [];
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6b6a66, roughness: 0.95 });
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffc070 });
+    this.toroGlowMat = new THREE.MeshBasicMaterial({ color: 0xffc070 });
+    const stoneParts = [], glowParts = [];
+    const place = (geo, x, y, z, ry = 0) => { const g = geo.clone(); if (ry) g.rotateY(ry); g.translate(x, y, z); return g; };
     for (let i = 0; i < 6; i++) {
       const side = i % 2 ? 1 : -1;
-      const g = new THREE.Group();
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.2, 8), stoneMat);
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.7, 8), stoneMat);
-      post.position.y = 0.45;
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.34, 0.42), stoneMat);
-      box.position.y = 0.97;
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.16, 0.2), glowMat);
-      win.position.y = 0.97;
-      const win2 = win.clone(); win2.rotation.y = Math.PI / 2;
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.3, 4), stoneMat);
-      roof.position.y = 1.3; roof.rotation.y = Math.PI / 4;
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), stoneMat);
-      knob.position.y = 1.5;
+      const x = side * (edge + 1.3 + rand() * 0.8), z = -30 + i * 6.2, y0 = 0.1;
+      const k = 1.1;
+      const parts = [
+        [new THREE.CylinderGeometry(0.28 * k, 0.34 * k, 0.2 * k, 8), 0.1],
+        [new THREE.CylinderGeometry(0.1 * k, 0.13 * k, 0.7 * k, 8), 0.45],
+        [new THREE.BoxGeometry(0.42 * k, 0.34 * k, 0.42 * k), 0.97],
+        [new THREE.ConeGeometry(0.46 * k, 0.3 * k, 4), 1.3, Math.PI / 4],
+        [new THREE.SphereGeometry(0.07 * k, 8, 6), 1.5],
+      ];
+      for (const [geo, yy, ry] of parts) stoneParts.push(place(geo.toNonIndexed ? geo.toNonIndexed() : geo, x, y0 + yy * k, z, ry || 0));
+      glowParts.push(place(new THREE.BoxGeometry(0.44 * k, 0.16 * k, 0.2 * k).toNonIndexed(), x, y0 + 0.97 * k, z));
+      glowParts.push(place(new THREE.BoxGeometry(0.2 * k, 0.16 * k, 0.44 * k).toNonIndexed(), x, y0 + 0.97 * k, z));
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.world.glowTex, color: 0xffb060, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
-      sprite.scale.set(1.8, 1.8, 1); sprite.position.y = 0.97;
-      g.add(base, post, box, win, win2, roof, knob, sprite);
-      g.position.set(side * (edge + 1.3 + rand() * 0.8), 0.1, -30 + i * 6.2);
-      g.scale.setScalar(1.1);
-      this.group.add(g);
-      this.toro.push({ g, sprite, glowMat: win.material });
+      sprite.scale.set(1.9, 1.9, 1);
+      sprite.position.set(x, y0 + 0.97 * k, z);
+      this.group.add(sprite);
+      this.toro.push({ sprite, z });
     }
+    const stripUV = (g) => { g.deleteAttribute('uv'); return g; };
+    this.group.add(new THREE.Mesh(mergeGeometries(stoneParts.map(stripUV)), stoneMat));
+    this.group.add(new THREE.Mesh(mergeGeometries(glowParts.map(stripUV)), this.toroGlowMat));
 
     // distant trees (billboard clusters)
     this.trees = [];
@@ -282,11 +285,9 @@ export class Scenery {
     this.rockMat.color.copy(cur.bank).lerp(new THREE.Color(0x777777), 0.35);
     this.reedMat.color.copy(cur.bankTop).multiplyScalar(0.9);
     const overhead = this.world.view * this.world.view * (3 - 2 * this.world.view);
-    for (const t of this.trees) { t.material.color.copy(cur.bank).lerp(cur.fog, 0.35); t.material.opacity = 1 - overhead * 0.85; }
-    for (const t of this.toro) {
-      t.sprite.material.opacity = (0.55 + 0.1 * Math.sin(time * 5 + t.g.position.z)) * Math.min(1.2, cur.glow);
-      t.glowMat.color.copy(cur.lantern);
-    }
+    for (const t of this.trees) { t.material.color.copy(cur.bank).lerp(cur.fog, 0.35); t.material.opacity = 1 - overhead; t.visible = overhead < 0.97; }
+    for (const t of this.toro) t.sprite.material.opacity = (0.55 + 0.1 * Math.sin(time * 5 + t.z)) * Math.min(1.2, cur.glow);
+    this.toroGlowMat.color.copy(cur.lantern);
     // reeds sway
     const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
     this.reedData.forEach((d, i) => {

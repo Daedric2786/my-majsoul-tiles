@@ -14,7 +14,11 @@ class AudioManager {
     this.musicStarted = false;
     this.lastPlay = new Map();
     this.format = 'ogg';
+    this.log = null; // capture mode: array of {t, type, ...}
+    this.clock = () => 0;
   }
+
+  rec(entry) { if (this.log) this.log.push({ t: +this.clock().toFixed(4), ...entry }); }
 
   // Must be called from a user gesture.
   unlock() {
@@ -113,6 +117,7 @@ class AudioManager {
     const last = this.lastPlay.get(name) || 0;
     if (now + delay - last < 0.025) return;
     this.lastPlay.set(name, now + delay);
+    this.rec({ type: 'sfx', name, vol, rate, pan, delay });
     const src = this.ctx.createBufferSource();
     src.buffer = s.buf;
     src.playbackRate.value = rate;
@@ -133,6 +138,7 @@ class AudioManager {
     const m = this.musicMeta;
     if (!m) return;
     this.musicStarted = true;
+    this.rec({ type: 'musicStart' });
     const c = this.ctx;
     const when = c.currentTime + 0.1;
     this.stemGains = {};
@@ -157,6 +163,7 @@ class AudioManager {
   // title: calm stem, filtered   play: calm stem   riichi: tension stem   shrine: calm, soft   fail: filtered low
   setMusicState(state, fade = 1.2) {
     this.state = state;
+    this.rec({ type: 'music', state, fade });
     if (!this.ctx || !this.stemGains) return;
     const t = this.ctx.currentTime;
     const mix = {
@@ -176,6 +183,7 @@ class AudioManager {
 
   duck(amount = 0.35, hold = 0.6, release = 0.8) {
     if (!this.ctx) return;
+    this.rec({ type: 'duck', amount, hold, release });
     const g = this.duckGain.gain, t = this.ctx.currentTime;
     g.cancelScheduledValues(t);
     g.setTargetAtTime(amount, t, 0.03);

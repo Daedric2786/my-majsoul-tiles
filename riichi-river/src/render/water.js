@@ -16,6 +16,7 @@ void main() {
 const frag = /* glsl */ `
 precision highp float;
 varying vec3 vWorld;
+uniform float uQuality;
 uniform float uTime;
 uniform float uFlow;
 uniform vec3 uDeep;
@@ -39,7 +40,6 @@ uniform vec3 uRapids;     // z0, z1, on
 uniform float uMist;      // mist line z (or -999)
 uniform float uFogNear;
 uniform float uFogFar;
-uniform float uQuality;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 float noise(vec2 p) {
@@ -49,8 +49,9 @@ float noise(vec2 p) {
 }
 float fbm(vec2 p) {
   float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
-  return v;
+  int oct = uQuality > 0.5 ? 4 : 2;
+  for (int i = 0; i < 4; i++) { if (i >= oct) break; v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
+  return oct == 4 ? v : v * 1.33;
 }
 
 // Height field of the flowing surface (flow is along +z).
@@ -90,6 +91,7 @@ void main() {
     if (i >= uTileCount) break;
     vec4 t = uTiles[i];
     vec2 d = p - t.xy;
+    if (d.x * d.x + (d.y + 1.0) * (d.y + 1.0) > 7.5) continue; // cheap reject (wake extends upstream)
     float r = length(d * vec2(1.0, 0.85));
     shadow += exp(-r * r * 5.5) * 0.55 * t.z;
     // bow wave: bright band just outside the tile, stronger on the upstream side
@@ -98,7 +100,7 @@ void main() {
     foamT += ring * up * 0.22 * t.z;
     // wake trailing upstream (water runs past the tile relative to its drift)
     float wake = exp(-abs(d.x) * 7.0) * smoothstep(0.35, -1.6, d.y) * smoothstep(-2.6, -0.3, d.y);
-    foamT += wake * 0.18 * t.z * (0.6 + 0.4 * noise(vec2(d.x * 9.0, (p.y - uFlow) * 5.0)));
+    foamT += wake * 0.18 * t.z * (0.7 + 0.3 * sin(d.x * 23.0 + (p.y - uFlow) * 11.0));
     // hint glimmer
     if (t.w > 0.5) {
       float pulse = 0.65 + 0.35 * sin(uTime * 5.0 + t.x * 3.0);

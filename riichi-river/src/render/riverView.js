@@ -81,7 +81,13 @@ export class RiverView {
     if (!it) return null;
     this.items.delete(id);
     this.group.remove(it.group);
+    this.disposeExtras(it);
     return it;
+  }
+
+  disposeExtras(it) {
+    if (it.halo) { it.group.remove(it.halo); it.halo.material.dispose(); it.halo = null; }
+    if (it.f && it.f.lantern) it.group.userData.sprite.material.dispose();
   }
 
   // Remove from the river but hand the mesh over (for catch animations).
@@ -89,6 +95,7 @@ export class RiverView {
     const it = this.items.get(id);
     if (!it) return null;
     this.items.delete(id);
+    this.disposeExtras(it);
     it.group.updateMatrixWorld(true);
     return it;
   }
@@ -144,6 +151,21 @@ export class RiverView {
     if (f.lantern) {
       g.userData.sprite.material.opacity = 0.7 + 0.3 * Math.sin(t * 6 + f.seed * 10);
     }
+    // winning tiles (riichi / tenpai) get a golden halo floating above them
+    const want = it.hint === 2 ? 1 : 0;
+    it.glowT += (want - it.glowT) * Math.min(1, dt * 6);
+    if (it.glowT > 0.01) {
+      if (!it.halo) {
+        it.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.goldGlow, color: 0xffc860, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+        it.halo.position.y = -0.02; // inside the tile: the tile body hides the centre -> a golden rim
+        g.add(it.halo);
+      }
+      it.halo.visible = true;
+      const pulse = 0.75 + 0.25 * Math.sin(t * 7 + f.seed * 5);
+      it.halo.material.opacity = it.glowT * (0.55 + 0.45 * pulse);
+      const hs = (1.35 + 0.2 * pulse) / Math.max(0.3, g.scale.x);
+      it.halo.scale.set(hs, hs, 1);
+    } else if (it.halo) it.halo.visible = false;
   }
 
   update(dt, floats) {

@@ -593,11 +593,14 @@ let acc = 0;
 let hudT = 0;
 const STEP = 1 / 120;
 const FIXED_DT = QS.get('dt') ? Number(QS.get('dt')) : 0; // debug: deterministic time-lapse capture
+let simClock = 0;
+if (QS.get('rec')) { audio.log = []; audio.clock = () => simClock; }
 
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = FIXED_DT || Math.min(0.05, Math.max(0, (now - last) / 1000));
   last = now;
+  simClock += dt;
   if (hitStop > 0) {
     hitStop -= dt;
     timeScale = hitStop > 0.25 ? 0.04 : 0.3;
@@ -617,6 +620,7 @@ function frame(now) {
   world.koiState = game && game.st && game.st.koi.length ? game.st.koi : null;
   const sim = game && (game.phase === 'play' || game.phase === 'intro') && !paused;
   const flowSpeed = sim ? game.speedNow() * timeScale : game ? 0.35 : 0.5;
+  adaptQuality(now);
   world.update(dt, flowSpeed);
   if (game && game.st) river.update(dt * (paused ? 0 : 1), game.st.floats);
   hand.update(dt);
@@ -631,6 +635,32 @@ function frame(now) {
     }
     updateTutorial(dt);
   }
+}
+
+// Adaptive resolution: keep frame time near 16.7 ms by trading render resolution first,
+// then water detail. Disabled in fixed-timestep capture mode.
+const perf = { last: 0, acc: 0, n: 0, windowStart: 0, goodFor: 0, quality: 1, maxDpr: Math.min(window.devicePixelRatio || 1, 2) };
+function adaptQuality(now) {
+  if (FIXED_DT || QS.get('dpr')) return;
+  if (perf.last) { perf.acc += now - perf.last; perf.n++; }
+  perf.last = now;
+  if (!perf.windowStart) perf.windowStart = now;
+  if (now - perf.windowStart < 2000 || document.hidden) return;
+  const avg = perf.acc / Math.max(1, perf.n);
+  perf.acc = 0; perf.n = 0; perf.windowStart = now;
+  if (avg > 21) {
+    perf.goodFor = 0;
+    if (world.dpr > 1.01) world.setDpr(Math.max(1, world.dpr - 0.25));
+    else if (perf.quality > 0) { perf.quality = 0; world.water.uniforms.uQuality.value = 0; }
+    else if (world.dpr > 0.76) world.setDpr(world.dpr - 0.125);
+  } else if (avg < 14) {
+    perf.goodFor++;
+    if (perf.goodFor >= 3) {
+      perf.goodFor = 0;
+      if (perf.quality === 0) { perf.quality = 1; world.water.uniforms.uQuality.value = 1; }
+      else if (world.dpr < perf.maxDpr - 0.01) world.setDpr(Math.min(perf.maxDpr, world.dpr + 0.25));
+    }
+  } else perf.goodFor = 0;
 }
 
 function updateTutorial(dt) {
@@ -662,6 +692,7 @@ window.__rr = {
   get paused() { return paused; },
   three: THREE,
   audio,
+  get simClock() { return simClock; },
 };
 
 boot();

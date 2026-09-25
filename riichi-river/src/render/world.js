@@ -3,6 +3,7 @@ import { makeWater, MAX_GLOWS } from './water.js';
 import { PALETTES } from './palettes.js';
 import { RIVER } from '../game/game.js';
 import { Scenery } from './scenery.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const tmpV = new THREE.Vector3();
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpC = new THREE.Vector3(), tmpD = new THREE.Vector3();
@@ -160,7 +161,7 @@ export class World {
     if (this.envRT) this.envRT.dispose();
     this.envRT = rt;
     this.scene.environment = rt.texture;
-    skyGeo.dispose(); skyMat.dispose();
+    envScene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   }
 
   // ------------------------------------------------------------------ decor
@@ -176,21 +177,23 @@ export class World {
     const railGeo = new THREE.BoxGeometry(0.46, 0.035, 0.035);
     const innerGeo = new THREE.PlaneGeometry(0.38, 0.38);
     innerGeo.rotateX(-Math.PI / 2);
+    const woodParts = [baseGeo.clone()];
+    for (let r = 0; r < 4; r++) {
+      const a = (r * Math.PI) / 2;
+      const rg = railGeo.clone();
+      rg.rotateY(a);
+      rg.translate(Math.sin(a) * 0.215, 0.45, Math.cos(a) * 0.215);
+      woodParts.push(rg);
+    }
+    const woodGeo = mergeGeometries(woodParts);
     for (let i = 0; i < 4; i++) {
       const g = new THREE.Group();
-      const base = new THREE.Mesh(baseGeo, woodMat);
-      const paper = new THREE.Mesh(paperGeo, [paperMat, paperMat, innerMat, innerMat, paperMat, paperMat]);
+      const wood = new THREE.Mesh(woodGeo, woodMat);
+      const paper = new THREE.Mesh(paperGeo, paperMat);
       paper.position.y = 0.24;
       const inner = new THREE.Mesh(innerGeo, innerMat);
       inner.position.y = 0.445;
-      g.add(base, paper, inner);
-      for (let r = 0; r < 4; r++) {
-        const rail = new THREE.Mesh(railGeo, woodMat);
-        const a = (r * Math.PI) / 2;
-        rail.position.set(Math.sin(a) * 0.215, 0.45, Math.cos(a) * 0.215);
-        rail.rotation.y = a;
-        g.add(rail);
-      }
+      g.add(wood, paper, inner);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: 0xffb45c, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
       sprite.scale.set(2.0, 2.0, 1);
       sprite.position.y = 0.4;
@@ -270,6 +273,12 @@ export class World {
   }
 
   // ------------------------------------------------------------------ camera
+  setDpr(dpr) {
+    this.dpr = dpr;
+    this.renderer.setPixelRatio(dpr);
+    if (this.w) this.renderer.setSize(this.w, this.h, false);
+  }
+
   resize(w, h, rackFrac, hudFrac = 0.1) {
     this.w = w; this.h = h;
     this.renderer.setPixelRatio(this.dpr);
