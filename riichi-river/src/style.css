@@ -40,7 +40,8 @@ body.in-riichi #vignette { background: radial-gradient(ellipse at 50% 42%, trans
 button { font-family: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
 /* ------------------------------------------------------------- HUD */
-#hud { position: absolute; left: 0; right: 0; top: 0; padding: calc(8px + var(--safe-top)) 12px 0; }
+#hud { position: absolute; left: 0; right: 0; top: 0; padding: calc(8px + var(--safe-top)) 12px 0; animation: hudIn 1.2s 0.5s both cubic-bezier(.2,.9,.3,1); }
+@keyframes hudIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
 .hud-top { display: flex; align-items: center; gap: 12px; max-width: 900px; margin: 0 auto; }
 .hud-station { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .seal {

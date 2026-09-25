@@ -3,6 +3,7 @@ import { t, tr, LANG_NAMES } from '../i18n.js';
 import { CHARM_BY_ID, CHARMS, MAX_CHARMS } from '../game/content.js';
 import { YAKU } from '../game/rules.js';
 import { faceDataURL } from '../render/faces.js';
+import { later, cancel, nowMs, nextFrame } from '../util/clock.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, html) => {
@@ -108,8 +109,8 @@ export class UI {
     const e = this.toastEl;
     e.textContent = msg;
     e.classList.add('show');
-    clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => e.classList.remove('show'), ms);
+    cancel(this.toastTimer);
+    this.toastTimer = later(() => e.classList.remove('show'), ms);
   }
 
   // ------------------------------------------------------------------ stamps
@@ -117,20 +118,20 @@ export class UI {
     const s = el('div', 'stamp call', `<span class="k">${kanji}</span><span class="r">${label}</span>`);
     s.style.left = `${x}px`; s.style.top = `${y}px`;
     this.stamps.appendChild(s);
-    setTimeout(() => s.remove(), 950);
+    later(() => s.remove(), 950);
   }
 
   bigStamp(kanji, label, gold = false) {
     const s = el('div', `stamp big${gold ? ' gold' : ''}`, `<div class="seal-box"><span class="k">${kanji}</span></div><span class="r">${label}</span>`);
     this.stamps.appendChild(s);
-    setTimeout(() => s.remove(), 1550);
+    later(() => s.remove(), 1550);
   }
 
   floatText(text, x, y) {
     const s = el('div', 'float-text', text);
     s.style.left = `${x}px`; s.style.top = `${y}px`;
     this.stamps.appendChild(s);
-    setTimeout(() => s.remove(), 1150);
+    later(() => s.remove(), 1150);
   }
 
   introBanner(def, index, target) {
@@ -144,7 +145,7 @@ export class UI {
       <div class="goal">${t('target')} ${fmt(target)}</div>
       ${feats ? `<div class="feats">${feats}</div>` : ''}`);
     this.stamps.appendChild(b);
-    setTimeout(() => b.remove(), 2450);
+    later(() => b.remove(), 2450);
   }
 
   tutorial(msg, pos = null) {
@@ -327,19 +328,19 @@ export class UI {
           `<span><span class="nm">${yakuTitle(y.id)}</span><span class="gl">${y.yakuman ? '' : yakuGloss(y.id)}</span></span><span class="hn">${y.yakuman ? t('limits').yakuman || 'Yakuman' : `${y.han} ${t('han')}`}</span>`);
         list.appendChild(row);
         audio.play('tally', { rate: Math.pow(2, Math.min(i, 12) / 12), vol: 0.8 });
-        this.timer = setTimeout(step, fast ? 40 : 260);
+        this.timer = later(step, fast ? 40 : 260);
       } else {
         // fu x han, then points count-up
         total.querySelector('.fh').textContent = result.yakuman ? tr().limits[result.limit] : `${result.fu}${t('fu')} · ${result.han}${t('han')}`;
         const ptsEl = total.querySelector('.pts');
-        const start = performance.now();
+        const start = nowMs();
         const dur = fast ? 150 : 700;
         audio.play('count', { vol: 0.8 });
         const tick = () => {
-          const k = Math.min(1, (performance.now() - start) / dur);
+          const k = Math.min(1, (nowMs() - start) / dur);
           const e = 1 - Math.pow(1 - k, 3);
           ptsEl.textContent = fmt(result.points * e);
-          if (k < 1) requestAnimationFrame(tick);
+          if (k < 1) nextFrame(tick);
           else {
             if (result.limit) {
               const ls = el('div', 'limit-stamp', tr().limits[result.limit]);
@@ -350,12 +351,12 @@ export class UI {
             hint.textContent = '▼';
           }
         };
-        requestAnimationFrame(tick);
+        nextFrame(tick);
       }
     };
-    this.timer = setTimeout(step, 250);
+    this.timer = later(step, 250);
     s.addEventListener('pointerdown', () => {
-      if (finished) { clearTimeout(this.timer); this.clearScreens(); onDone(); }
+      if (finished) { cancel(this.timer); this.clearScreens(); onDone(); }
       else fast = true;
     });
   }

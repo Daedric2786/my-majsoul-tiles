@@ -353,7 +353,7 @@ export class HandView {
     if (this.stick.visible && this.layoutInfo) {
       const L = this.layoutInfo;
       this.stickAnim = Math.min(1, this.stickAnim + dt * 2.5);
-      const p = this.pxToLocal(L.w / 2, L.top + 2, D);
+      const p = this.pxToLocal(L.w / 2, L.top - 6, D);
       const e = 1 - Math.pow(1 - this.stickAnim, 3);
       this.stick.position.set(p.x, p.y + (1 - e) * 0.5, p.z + 0.1);
       const width = Math.min(L.w * 0.5, 260) * this.wpp(D);

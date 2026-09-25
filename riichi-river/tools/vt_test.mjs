@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const page = await browser.newPage({ viewport: { width: 480, height: 270 } });
+await page.goto('http://localhost:4173/?rec=1', { waitUntil: 'load' });
+await page.waitForTimeout(2500);
+const cdp = await page.context().newCDPSession(page);
+await cdp.send('Emulation.setVirtualTimePolicy', { policy: 'pause' });
+const t0 = await page.evaluate(() => [performance.now(), window.__rr.simClock]);
+const step = async (ms) => { const p = new Promise((res) => cdp.once('Emulation.virtualTimeBudgetExpired', res)); await cdp.send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: ms }); await p; };
+const t = Date.now();
+for (let i = 0; i < 30; i++) await step(1000 / 30);
+const t1 = await page.evaluate(() => [performance.now(), window.__rr.simClock]);
+console.log('virtual', (t1[0] - t0[0]).toFixed(1), 'ms; sim', (t1[1] - t0[1]).toFixed(3), 's; wall', Date.now() - t, 'ms');
+await page.screenshot({ path: 'tools/shots/vt.png' });
+await browser.close();

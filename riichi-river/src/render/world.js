@@ -386,6 +386,7 @@ export class World {
       this.view = this.viewTarget > this.view ? Math.min(this.viewTarget, this.view + sp) : Math.max(this.viewTarget, this.view - sp);
     }
     const vb = this.view * this.view * (3 - 2 * this.view);
+    this.viewEase = vb;
     const portrait = this.w / this.h < 0.9;
     const titlePos = tmpA.set(0, portrait ? 2.1 : 2.5, portrait ? 7.5 : 6.5);
     const titleTgt = tmpB.set(0, portrait ? 1.6 : 1.2, -30);

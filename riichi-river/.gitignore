@@ -4,3 +4,5 @@ dist/
 tools/fonts_src/
 tools/shots/
 tools/audio/out/
+tools/record/*/
+dist-artifact/

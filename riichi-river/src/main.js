@@ -13,6 +13,7 @@ import { t, setLang, detectLang, tr } from './i18n.js';
 import { audio } from './audio/audio.js';
 import { loadSave, save, persist, mergeYaku, todayKey } from './save.js';
 import { platform } from './platform.js';
+import { clock, later, tickClock } from './util/clock.js';
 
 const canvas = document.getElementById('gl');
 const QS = new URLSearchParams(location.search);
@@ -46,6 +47,7 @@ async function boot() {
     ]);
   } catch (e) { /* fonts are progressive enhancement */ }
 
+  audio.init();
   world = new World(canvas);
   if (QS.get('dpr')) world.dpr = Number(QS.get('dpr'));
   world.shakeEnabled = S.settings.shake;
@@ -64,7 +66,7 @@ async function boot() {
 
   startAmbient();
   showTitle();
-  requestAnimationFrame(frame);
+  if (!clock.manual) requestAnimationFrame(frame);
   document.getElementById('boot').classList.add('gone');
   platform.loadingStop();
 }
@@ -109,7 +111,7 @@ function onResize() {
 function positionOverlays() {
   const L = hand.layoutInfo;
   if (!L) return;
-  const bottom = H - L.top + 8;
+  const bottom = H - L.top + 18;
   ui.setRiichiButton(game && mode === 'play' && game.canRiichi() && !paused, bottom);
   if (game && game.st) ui.setWaits(game.st.riichi ? game.st.riichi.waits : null, bottom, !!game.st.riichi);
 }
@@ -190,6 +192,7 @@ function startRun({ daily = false, resume = null }) {
     game.refreshMods();
     game.startStation();
   }
+  if (QS.get('station') && !resume) { game.run.stationIndex = Number(QS.get('station')); game.startStation(); } // debug: jump to a river
   S.runs++;
   S.run = null;
   persist();
@@ -227,10 +230,19 @@ function setWaterFeatures(features) {
 // ------------------------------------------------------------------ game events
 let lastToast = {};
 function toastOnce(key, msg, gap = 2.5) {
-  const now = performance.now() / 1000;
+  const now = clock.manual ? clock.now : performance.now() / 1000;
   if (lastToast[key] && now - lastToast[key] < gap) return;
   lastToast[key] = now;
   ui.toast(msg);
+}
+
+// A tap on open water still answers: a small ripple where the finger touched.
+const tapRay = new THREE.Raycaster();
+const waterPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function waterTap(x, y) {
+  tapRay.setFromCamera(new THREE.Vector2((x / W) * 2 - 1, -(y / H) * 2 + 1), world.camera);
+  const p = tapRay.ray.intersectPlane(waterPlane, TMP);
+  if (p && Math.abs(p.x) < RIVER.halfWidth + 0.6) world.water.ripple(p.x, p.z, 0.45);
 }
 
 function screenOfWorld(x, y, z) {
@@ -281,7 +293,7 @@ function onEvent(type, d) {
     }
     case 'meld': {
       const tile = d.tiles[1];
-      setTimeout(() => {
+      later(() => {
         const p = hand.screenOf(tile.id);
         const n = game.st ? game.hand.melds.length : 1;
         const kan = d.meldType === 'chi' ? ['吃', t('chi')] : ['碰', t('pon')];
@@ -294,7 +306,7 @@ function onEvent(type, d) {
       break;
     }
     case 'kan': {
-      setTimeout(() => {
+      later(() => {
         const p = hand.screenOf(d.tile.id);
         if (p) ui.callStamp('槓', t('kan').toUpperCase(), p.x, p.y - 30);
         audio.play('kan', { vol: 1 });
@@ -373,7 +385,7 @@ function onEvent(type, d) {
       if (tut) { ui.tutorial(null); tut = null; }
       mergeYaku(game.run.yakuSeen); game.run.yakuSeen = {};
       persist();
-      setTimeout(() => ui.stationClear({ ...d, onNext: showShrine }), 700);
+      later(() => ui.stationClear({ ...d, onNext: showShrine }), 700);
       break;
     }
     case 'stationFail': {
@@ -383,7 +395,7 @@ function onEvent(type, d) {
       platform.gameplayStop();
       mergeYaku(game.run.yakuSeen); game.run.yakuSeen = {};
       persist();
-      setTimeout(() => ui.stationFail({
+      later(() => ui.stationFail({
         ...d,
         onRetry: () => { ui.clearScreens(); platform.commercialBreak(audio).then(() => { platform.gameplayStart(); game.retryStation(); }); },
         onEnd: () => endRun(false),
@@ -407,7 +419,7 @@ function onCatch(d) {
     f.tiles.forEach((tile, i) => hand.flyIn(tile, tiles[i], i * 0.06));
     river.group.add(it.group); // the empty raft keeps floating a moment
     it.group.userData.raftTiles = [];
-    setTimeout(() => river.group.remove(it.group), 400);
+    later(() => river.group.remove(it.group), 400);
   } else {
     hand.flyIn(f.tile, it.group);
   }
@@ -432,7 +444,7 @@ function onWin(d) {
     fx.sparkle(p, big ? 14 : 8, [1, 0.8, 0.4], 0.5, 9);
   }
   if (tut) { ui.tutorial(null); }
-  setTimeout(() => {
+  later(() => {
     audio.setMusicState('score', 0.6);
     ui.scoring({
       result: d.result, hand: d.hand, uraIndicators: d.uraIndicators, audio,
@@ -562,6 +574,7 @@ function bindInput() {
     }
     const fid = river.pick(x, y, game.st.floats, W, H);
     if (fid != null) game.tryCatch(fid);
+    else waterTap(x, y);
   }, { passive: false });
   canvas.addEventListener('pointermove', (e) => {
     if (mode !== 'play' || !game.st || e.pointerType !== 'mouse') return;
@@ -595,12 +608,14 @@ const STEP = 1 / 120;
 const FIXED_DT = QS.get('dt') ? Number(QS.get('dt')) : 0; // debug: deterministic time-lapse capture
 let simClock = 0;
 if (QS.get('rec')) { audio.log = []; audio.clock = () => simClock; }
+clock.manual = !!QS.get('manual');
 
 function frame(now) {
-  requestAnimationFrame(frame);
+  if (!clock.manual) requestAnimationFrame(frame);
   let dt = FIXED_DT || Math.min(0.05, Math.max(0, (now - last) / 1000));
   last = now;
   simClock += dt;
+  if (clock.manual) tickClock(dt);
   if (hitStop > 0) {
     hitStop -= dt;
     timeScale = hitStop > 0.25 ? 0.04 : 0.3;
@@ -623,6 +638,8 @@ function frame(now) {
   adaptQuality(now);
   world.update(dt, flowSpeed);
   if (game && game.st) river.update(dt * (paused ? 0 : 1), game.st.floats);
+  // the rack rises into place as the camera settles into the play view
+  hand.root.position.y = -Math.pow(1 - (world.viewEase ?? 1), 2) * 1.6;
   hand.update(dt);
   fx.update(dt);
   world.render();
@@ -693,6 +710,7 @@ window.__rr = {
   three: THREE,
   audio,
   get simClock() { return simClock; },
+  advance: (n = 1) => { for (let i = 0; i < n; i++) frame(0); },
 };
 
 boot();

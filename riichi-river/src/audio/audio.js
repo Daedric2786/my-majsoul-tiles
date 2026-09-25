@@ -20,8 +20,11 @@ class AudioManager {
 
   rec(entry) { if (this.log) this.log.push({ t: +this.clock().toFixed(4), ...entry }); }
 
-  // Must be called from a user gesture.
-  unlock() {
+  // Create the context early (suspended until a gesture) so assets decode during boot.
+  init() { this.unlock(true); }
+
+  // Must be called from a user gesture to actually start sound.
+  unlock(fromBoot = false) {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -46,7 +49,7 @@ class AudioManager {
       this.format = probe.canPlayType('audio/ogg; codecs="opus"') ? 'ogg' : 'mp3';
       this.load();
     }
-    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    if (!fromBoot && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
   }
 
   async fetchDecode(url) {
