@@ -3,3 +3,4 @@ dist/
 *.log
 tools/fonts_src/
 tools/shots/
+tools/audio/out/

@@ -301,6 +301,11 @@ export class UI {
     });
     for (const tl of result.pair) { const i = el('img'); i.src = this.face(tl.kind, tl.red); handRow.appendChild(i); }
     p.appendChild(handRow);
+    if (uraIndicators && uraIndicators.length) {
+      const ur = el('div', 'ura-row', `<span>${t('ura')}</span>`);
+      for (const k of uraIndicators) { const i = el('img'); i.src = this.face(k); ur.appendChild(i); }
+      p.appendChild(ur);
+    }
     const list = el('div', 'yaku-list');
     p.appendChild(list);
     const total = el('div', 'score-total', `<span class="fh"></span><span class="pts">0</span>`);

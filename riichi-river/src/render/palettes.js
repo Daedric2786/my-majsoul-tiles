@@ -26,9 +26,9 @@ export const PALETTES = {
     ambient: 0x3a4a7a, ground: 0x070a12, lantern: 0xffb45c, glow: 1.4, stars: 1, petals: 0xd8e4ff,
   },
   mist: {
-    deep: 0x283a44, shallow: 0x62808a, sky: 0xdfe6e8, skyTop: 0x9fb0b8, foam: 0xf4f8f8,
-    fog: 0xaebcc2, bank: 0x2a3136, bankTop: 0x46534e, sun: 0xf0f4f4, sunDir: [0, 1, -0.6],
-    ambient: 0x9aa8b0, ground: 0x2c3438, lantern: 0xffc98a, glow: 0.7, stars: 0, petals: 0xffffff,
+    deep: 0x1e3440, shallow: 0x46707c, sky: 0xc9d4d8, skyTop: 0x8a9ca6, foam: 0xe6eeee,
+    fog: 0xa9b8be, bank: 0x243036, bankTop: 0x3c4c46, sun: 0xeef2f2, sunDir: [0.2, 0.6, -1],
+    ambient: 0x93a3ac, ground: 0x283236, lantern: 0xffc98a, glow: 0.8, stars: 0, petals: 0xffffff,
   },
   falls: {
     deep: 0x07222c, shallow: 0x2d7d86, sky: 0xbfe4ff, skyTop: 0x2f5070, foam: 0xf2fbff,

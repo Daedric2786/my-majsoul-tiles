@@ -101,11 +101,11 @@ export class HandView {
   computeLayout(w, h, cap, safeBottom = 0) {
     const portrait = w / h < 0.9;
     const pad = 14, gap = portrait ? 6 : 8;
-    const trayW = Math.max(38, Math.min(portrait ? 70 : 74, (Math.min(w, 900) - pad * 2 - gap * (cap - 1)) / cap));
+    const trayW = Math.max(38, Math.min(portrait ? 70 : Math.min(66, h * 0.09), (Math.min(w, 900) - pad * 2 - gap * (cap - 1)) / cap));
     const trayH = trayW * (TILE_L / TILE_W);
     const bottom = Math.max(10, safeBottom + 8);
     const trayY = h - bottom - trayH / 2 - 4;
-    const mW = Math.max(18, Math.min(portrait ? 34 : 42, (Math.min(w, 900) - pad * 2 - 3 * 12) / 12.4));
+    const mW = Math.max(18, Math.min(portrait ? 34 : Math.min(38, h * 0.052), (Math.min(w, 900) - pad * 2 - 3 * 12) / 12.4));
     const mH = mW * (TILE_L / TILE_W);
     const meldY = trayY - trayH / 2 - 12 - mH / 2;
     const top = meldY - mH / 2 - 14;
@@ -320,12 +320,17 @@ export class HandView {
         }
         continue;
       }
-      // spring towards target
+      // spring towards target (sub-stepped semi-implicit Euler: stable for any frame time)
       const k = 260, c = 24;
-      vTmp.copy(it.target).sub(g.position).multiplyScalar(k);
-      vTmp.addScaledVector(it.vel, -c);
-      it.vel.addScaledVector(vTmp, dt);
-      g.position.addScaledVector(it.vel, dt);
+      let rem = dt;
+      while (rem > 1e-6) {
+        const h = Math.min(rem, 1 / 240);
+        vTmp.copy(it.target).sub(g.position).multiplyScalar(k);
+        vTmp.addScaledVector(it.vel, -c);
+        it.vel.addScaledVector(vTmp, h);
+        g.position.addScaledVector(it.vel, h);
+        rem -= h;
+      }
       // hop (win wave)
       if (it.hop > 0) {
         if (it.hopDelay > 0) it.hopDelay -= dt;
@@ -348,7 +353,7 @@ export class HandView {
     if (this.stick.visible && this.layoutInfo) {
       const L = this.layoutInfo;
       this.stickAnim = Math.min(1, this.stickAnim + dt * 2.5);
-      const p = this.pxToLocal(L.w / 2, L.trayY - L.trayH / 2 - 6, D);
+      const p = this.pxToLocal(L.w / 2, L.top + 2, D);
       const e = 1 - Math.pow(1 - this.stickAnim, 3);
       this.stick.position.set(p.x, p.y + (1 - e) * 0.5, p.z + 0.1);
       const width = Math.min(L.w * 0.5, 260) * this.wpp(D);

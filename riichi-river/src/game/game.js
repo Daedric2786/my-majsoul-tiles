@@ -10,12 +10,12 @@ import { STATIONS, endlessStation, CHARMS, CHARM_BY_ID, modsFromCharms, MAX_CHAR
 import { makeRng } from './rng.js';
 
 export const RIVER = {
-  halfWidth: 2.35, // tiles stay within [-halfWidth, halfWidth]
+  halfWidth: 2.2, // tiles stay within [-halfWidth, halfWidth]
   zSpawn: -13.8,
   zLose: 2.2,
   mistZ: -5.0,
   rapidsZ: [-8.5, -3.6],
-  eddy: { x: 0.6, z: -7.4, r: 1.3 },
+  eddy: { x: 0.5, z: -7.4, r: 1.25 },
 };
 
 const START_LIVES = 3;
@@ -534,7 +534,7 @@ export class Game {
     st.cleared = true;
     this.phase = 'clear';
     const left = this.tilesLeft();
-    const riverCoins = Math.floor((left / 2) * this.mods.coinMul);
+    const riverCoins = Math.floor((left / 3) * this.mods.coinMul);
     const coins = 3 + riverCoins + (st.limitCoins || 0);
     this.run.coins += coins;
     this.emit('stationClear', { score: st.score, target: st.target, tilesLeft: left, coins, riverCoins, limitCoins: st.limitCoins || 0, index: this.run.stationIndex });

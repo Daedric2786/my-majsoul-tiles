@@ -67,6 +67,18 @@ class AudioManager {
       for (const [name, s] of Object.entries(meta.sprites)) this.sfx.set(name, { buf, start: s[0], dur: s[1] });
       this.ready = true;
       this.onReady?.();
+      // river ambience bed
+      const amb = await this.loadWithFallback('ambience');
+      const src = this.ctx.createBufferSource();
+      src.buffer = amb;
+      src.loop = true;
+      src.loopStart = meta.ambience.loopStart;
+      src.loopEnd = meta.ambience.loopEnd;
+      this.ambGain = this.ctx.createGain();
+      this.ambGain.gain.value = 0;
+      src.connect(this.ambGain).connect(this.sfxBus);
+      src.start();
+      this.ambGain.gain.setTargetAtTime(0.55, this.ctx.currentTime, 1.5);
     } catch (e) {
       console.warn('SFX unavailable', e);
     }

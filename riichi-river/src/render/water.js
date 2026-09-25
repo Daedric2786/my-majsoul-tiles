@@ -93,9 +93,9 @@ void main() {
     float r = length(d * vec2(1.0, 0.85));
     shadow += exp(-r * r * 5.5) * 0.55 * t.z;
     // bow wave: bright band just outside the tile, stronger on the upstream side
-    float ring = exp(-pow((r - 0.52) * 9.0, 2.0));
-    float up = 0.6 + 0.4 * smoothstep(0.3, -0.5, d.y);
-    foamT += ring * up * 0.55 * t.z;
+    float ring = exp(-pow((r - 0.5) * 11.0, 2.0));
+    float up = 0.35 + 0.65 * smoothstep(0.3, -0.5, d.y);
+    foamT += ring * up * 0.22 * t.z;
     // wake trailing upstream (water runs past the tile relative to its drift)
     float wake = exp(-abs(d.x) * 7.0) * smoothstep(0.35, -1.6, d.y) * smoothstep(-2.6, -0.3, d.y);
     foamT += wake * 0.18 * t.z * (0.6 + 0.4 * noise(vec2(d.x * 9.0, (p.y - uFlow) * 5.0)));
@@ -142,14 +142,17 @@ void main() {
   vec3 R = reflect(-V, N);
   float skyT = clamp(R.y * 1.2, 0.0, 1.0);
   vec3 skyCol = mix(uSky, uSkyTop, pow(skyT, 0.7));
-  vec3 col = mix(body, skyCol, clamp(0.14 + fres * 1.3, 0.0, 0.8));
+  // low reflection angles see the dark banks / mountains rather than open sky
+  skyCol = mix(mix(uBank, uFog, 0.45) * 1.1, skyCol, smoothstep(0.03, 0.22, R.y + (abs(p.x) / (uHalfWidth + 1.0)) * -0.08));
+  // capped so ivory tiles always stand out against the water
+  vec3 col = mix(body, skyCol * 0.85, clamp(0.1 + fres * 0.8, 0.0, 0.5));
 
   // sun / moon glitter path
   vec3 L = normalize(uSunDir);
   float sd = max(dot(R, L), 0.0);
-  col += uSun * (pow(sd, 90.0) * 1.8 + pow(sd, 12.0) * 0.08);
+  col += uSun * (pow(sd, 90.0) * 0.9 + pow(sd, 12.0) * 0.035);
   float sparkle = smoothstep(0.975, 0.995, noise(p * vec2(7.0, 12.0) + vec2(uTime * 0.9, -uFlow * 5.0)));
-  col += uSun * sparkle * pow(sd, 4.0) * 1.2 * uQuality;
+  col += uSun * sparkle * pow(sd, 4.0) * 0.6 * uQuality;
 
   // lantern reflections: streaks stretched toward the viewer
   for (int i = 0; i < ${MAX_GLOWS}; i++) {
@@ -181,9 +184,10 @@ void main() {
 
   // ------------- mist
   if (uMist > -900.0) {
-    float m = smoothstep(uMist + 1.4, uMist - 1.2, p.y);
-    float mn = fbm(vec2(p.x * 0.6 + uTime * 0.05, p.y * 0.4 - uTime * 0.02));
-    col = mix(col, uFog * 1.05, m * (0.55 + 0.35 * mn));
+    // soft bank of mist over the upper river: low-contrast, slowly drifting wisps
+    float m = smoothstep(uMist + 1.6, uMist - 1.4, p.y);
+    float mn = fbm(vec2(p.x * 0.35 + uTime * 0.04, p.y * 0.25 - uTime * 0.015));
+    col = mix(col, uFog, m * (0.72 + 0.18 * mn));
   }
 
   // ------------- distance fog

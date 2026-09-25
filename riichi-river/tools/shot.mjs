@@ -10,5 +10,5 @@ await page.goto(process.env.URL || 'http://localhost:5173/?dt=0.05', { waitUntil
 await page.waitForTimeout(2500);
 if (extra) { const mod = await import(new URL(extra, 'file://' + process.cwd() + '/').href); await mod.default(page); }
 await page.screenshot({ path: `tools/shots/${name}.png` });
-console.log(logs.slice(-15).join('\n'));
+console.log(logs.filter((l) => !l.includes('PD')).slice(-15).join('\n')); console.log(logs.filter((l) => l.includes('PD')).slice(-6).join('\n'));
 await browser.close();

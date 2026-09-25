@@ -47,6 +47,7 @@ async function boot() {
   } catch (e) { /* fonts are progressive enhancement */ }
 
   world = new World(canvas);
+  if (QS.get('dpr')) world.dpr = Number(QS.get('dpr'));
   world.shakeEnabled = S.settings.shake;
   buildAtlas();
   factory = new TileFactory(atlasTex);
@@ -125,6 +126,7 @@ function startAmbient() {
   world.setPalette('dusk');
   setWaterFeatures([]);
   hand.root.visible = false;
+  world.setView(0);
   ui.showHud(false);
   audio.setMusicState('title');
   onResize();
@@ -171,6 +173,7 @@ function startRun({ daily = false, resume = null }) {
   river.clear();
   hand.clearAll();
   hand.root.visible = true;
+  world.setView(1);
   mode = 'play';
   paused = false;
   const tutorial = !S.tutorialDone && !resume && !daily;
@@ -238,6 +241,9 @@ function screenOfWorld(x, y, z) {
 function onEvent(type, d) {
   switch (type) {
     case 'stationStart': {
+      // debug knobs for automated flow tests (never set in normal play)
+      if (QS.get('kind')) game.st.def = { ...game.st.def, kindness: Number(QS.get('kind')) };
+      if (QS.get('target')) { game.st.target = Number(QS.get('target')); d.target = game.st.target; }
       river.clear();
       hand.clearAll();
       world.setPalette(d.def.palette);
@@ -248,7 +254,7 @@ function onEvent(type, d) {
       ui.introBanner(d.def, d.index, d.target);
       audio.play('gong', { vol: 0.8 });
       audio.setMusicState('play');
-      document.body.classList.remove('riichi');
+      document.body.classList.remove('in-riichi');
       hand.setLocked(false);
       break;
     }
@@ -327,7 +333,7 @@ function onEvent(type, d) {
       audio.duck(0.4, 0.4, 0.8);
       audio.setMusicState('riichi', 0.8);
       ui.bigStamp('立直', t('riichi').toUpperCase());
-      document.body.classList.add('riichi');
+      document.body.classList.add('in-riichi');
       hand.setLocked(true);
       world.addShake(0.35);
       world.punch(0.6);
@@ -354,7 +360,7 @@ function onEvent(type, d) {
       }
       hand.layout(game.hand, true);
       hand.setLocked(false);
-      document.body.classList.remove('riichi');
+      document.body.classList.remove('in-riichi');
       ui.setScore(d.score, d.target);
       ui.setBlessing(0);
       audio.setMusicState('play');
@@ -421,11 +427,10 @@ function onWin(d) {
   // celebratory sparks from the rack
   const L = hand.layoutInfo;
   for (let i = 0; i < 5; i++) {
-    const p = hand.pxToLocal(L.w * (0.2 + i * 0.15), L.trayY, 3);
+    const p = hand.pxToLocal(L.w * (0.2 + i * 0.15), L.meldY - 20, 3.4);
     world.camera.localToWorld(p);
-    fx.sparkle(p, big ? 26 : 14, [1, 0.8, 0.4], 1.2, 26);
+    fx.sparkle(p, big ? 14 : 8, [1, 0.8, 0.4], 0.5, 9);
   }
-  if (d.riichi && d.uraIndicators.length) setTimeout(() => toastOnce('ura', `${t('ura')}: ${d.uraIndicators.map((k) => kindName(k)).join(' ')}`), 600);
   if (tut) { ui.tutorial(null); }
   setTimeout(() => {
     audio.setMusicState('score', 0.6);
@@ -609,6 +614,7 @@ function frame(now) {
     }
     if (n >= 8) acc = 0;
   }
+  world.koiState = game && game.st && game.st.koi.length ? game.st.koi : null;
   const sim = game && (game.phase === 'play' || game.phase === 'intro') && !paused;
   const flowSpeed = sim ? game.speedNow() * timeScale : game ? 0.35 : 0.5;
   world.update(dt, flowSpeed);
@@ -651,7 +657,11 @@ window.__rr = {
   handRect: (id) => hand.rects.get(id),
   world: () => world,
   hand: () => hand,
+  river: () => river,
+  pick: (x, y) => river.pick(x, y, game.st.floats, W, H),
+  get paused() { return paused; },
   three: THREE,
+  audio,
 };
 
 boot();

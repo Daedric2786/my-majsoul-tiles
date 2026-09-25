@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { makeWater, MAX_GLOWS } from './water.js';
 import { PALETTES } from './palettes.js';
 import { RIVER } from '../game/game.js';
+import { Scenery } from './scenery.js';
 
 const tmpV = new THREE.Vector3();
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpC = new THREE.Vector3(), tmpD = new THREE.Vector3();
 
 export function glowTexture(size = 128, inner = 'rgba(255,255,255,1)', mid = 'rgba(255,220,160,0.35)') {
   const c = document.createElement('canvas');
@@ -66,6 +68,10 @@ export class World {
     this.glows = []; // world glow sources for water reflections
 
     this.buildDecor();
+    this.scenery = new Scenery(this);
+    this.view = 0; // 0 = title (horizon), 1 = play (overhead)
+    this.viewTarget = 0;
+    this.koiState = null;
     this.setPalette('dusk', true);
   }
 
@@ -275,12 +281,14 @@ export class World {
   fitCamera(aspect, rackFrac, hudFrac = 0.1) {
     const cam = this.camera;
     const portrait = aspect < 0.9;
-    const pitch = THREE.MathUtils.degToRad(portrait ? 62 : 54);
     const zTop = RIVER.zSpawn + 1.2, zBot = RIVER.zLose - 0.2;
     const yTopWant = 1 - 2 * hudFrac, yBotWant = -1 + 2 * rackFrac;
     const halfW = RIVER.halfWidth + 0.5;
+    // landscape: the near river should span ~40% of the screen width (tiles ~50px on 1280x720)
+    const nearWant = portrait ? 0.985 : Math.min(0.62, 0.42 * (16 / 9) / aspect + 0.05);
     const proj = new THREE.Vector3();
-    const evalP = (fov, d, zT) => {
+    const evalP = (fov, d, zT, pitchDeg) => {
+      const pitch = THREE.MathUtils.degToRad(pitchDeg);
       cam.fov = fov;
       cam.aspect = aspect;
       cam.position.set(0, Math.sin(pitch) * d, zT + Math.cos(pitch) * d);
@@ -291,38 +299,38 @@ export class World {
       const yB = proj.set(0, 0, zBot).project(cam).y;
       const xW = Math.abs(proj.set(halfW, 0, zBot - 0.8).project(cam).x);
       let err = (yT - yTopWant) ** 2 + (yB - yBotWant) ** 2 * 1.5;
-      if (xW > 0.985) err += (xW - 0.985) ** 2 * 40;
-      err += ((fov - (portrait ? 50 : 38)) / 60) ** 2 * 0.02;
+      if (portrait) { if (xW > 0.985) err += (xW - 0.985) ** 2 * 40; }
+      else err += (xW - nearWant) ** 2 * 6;
+      err += ((fov - (portrait ? 50 : 40)) / 60) ** 2 * 0.02;
+      err += ((pitchDeg - (portrait ? 62 : 52)) / 60) ** 2 * 0.02;
       return err;
     };
     let best = { err: Infinity };
-    for (let fov = 28; fov <= 78; fov += 2) {
-      for (let d = 8; d <= 34; d += 1) {
-        for (let zT = -12; zT <= 2; zT += 1) {
-          const err = evalP(fov, d, zT);
-          if (err < best.err) best = { err, fov, d, zT };
+    for (let pitch = portrait ? 56 : 38; pitch <= (portrait ? 66 : 64); pitch += 4) {
+      for (let fov = 28; fov <= 78; fov += 4) {
+        for (let d = 8; d <= 34; d += 1.5) {
+          for (let zT = -12; zT <= 2; zT += 1.5) {
+            const err = evalP(fov, d, zT, pitch);
+            if (err < best.err) best = { err, fov, d, zT, pitch };
+          }
         }
       }
     }
-    // refine
-    let step = { fov: 1, d: 0.5, zT: 0.5 };
-    for (let it = 0; it < 40; it++) {
-      for (const k of ['fov', 'd', 'zT']) {
-        for (const s of [-1, 1]) {
-          const c = { ...best, [k]: best[k] + s * step[k] };
-          const err = evalP(c.fov, c.d, c.zT);
+    let step = { fov: 2, d: 0.75, zT: 0.75, pitch: 2 };
+    for (let it = 0; it < 48; it++) {
+      for (const k of ['fov', 'd', 'zT', 'pitch']) {
+        for (const sg of [-1, 1]) {
+          const c = { ...best, [k]: best[k] + sg * step[k] };
+          const err = evalP(c.fov, c.d, c.zT, c.pitch);
           if (err < best.err) best = { ...c, err };
         }
       }
-      if (it % 10 === 9) step = { fov: step.fov / 2, d: step.d / 2, zT: step.zT / 2 };
+      if (it % 12 === 11) step = { fov: step.fov / 2, d: step.d / 2, zT: step.zT / 2, pitch: step.pitch / 2 };
     }
-    evalP(best.fov, best.d, best.zT);
+    evalP(best.fov, best.d, best.zT, best.pitch);
     this.camBase.pos.copy(cam.position);
     this.camBase.target.set(0, 0, best.zT);
     this.camFit = best;
-    const u = this.water.uniforms;
-    u.uFogNear.value = best.d + 4;
-    u.uFogFar.value = best.d + 16;
   }
 
   // ------------------------------------------------------------------ frame
@@ -361,18 +369,39 @@ export class World {
     this.petals.material.uniforms.uTime.value = this.time;
     this.petals.material.uniforms.uScale.value = this.h ? this.h / 720 * this.dpr : 1;
 
-    // camera: base + gentle breathing + shake + punch
+    this.scenery.update(dt, this.cur, this.koiState, this.time);
+
+    // view blend title <-> play
+    if (this.view !== this.viewTarget) {
+      const sp = dt / 1.9;
+      this.view = this.viewTarget > this.view ? Math.min(this.viewTarget, this.view + sp) : Math.max(this.viewTarget, this.view - sp);
+    }
+    const vb = this.view * this.view * (3 - 2 * this.view);
+    const portrait = this.w / this.h < 0.9;
+    const titlePos = tmpA.set(0, portrait ? 2.1 : 2.5, portrait ? 7.5 : 6.5);
+    const titleTgt = tmpB.set(0, portrait ? 1.6 : 1.2, -30);
+    const fit = this.camFit || { fov: 40 };
     const cam = this.camera;
+    cam.fov = (portrait ? 62 : 46) * (1 - vb) + fit.fov * vb;
+    cam.updateProjectionMatrix();
+    u.uFogNear.value = 14 * (1 - vb) + (fit.d + 4 || 18) * vb;
+    u.uFogFar.value = 60 * (1 - vb) + (fit.d + 16 || 30) * vb;
+    const basePos = tmpC.copy(titlePos).lerp(this.camBase.pos, vb);
+    const baseTgt = tmpD.copy(titleTgt).lerp(this.camBase.target, vb);
+    // title camera drifts gently over the water
+    basePos.x += Math.sin(this.time * 0.12) * 0.6 * (1 - vb);
     this.shake = Math.max(0, this.shake - dt * 2.5);
     const s = this.shakeEnabled ? this.shake * this.shake : 0;
     const bx = Math.sin(this.time * 0.23) * 0.06 + (Math.random() - 0.5) * s * 0.25;
     const by = Math.sin(this.time * 0.31) * 0.04 + (Math.random() - 0.5) * s * 0.25;
     this.camPunch *= Math.exp(-dt * 6);
-    tmpV.copy(this.camBase.target).sub(this.camBase.pos).normalize().multiplyScalar(this.camPunch);
-    cam.position.copy(this.camBase.pos).add(this.camOffset).add(tmpV);
+    tmpV.copy(baseTgt).sub(basePos).normalize().multiplyScalar(this.camPunch);
+    cam.position.copy(basePos).add(this.camOffset).add(tmpV);
     cam.position.x += bx; cam.position.y += by;
-    cam.lookAt(this.camBase.target.x + bx * 0.5, this.camBase.target.y, this.camBase.target.z);
+    cam.lookAt(baseTgt.x + bx * 0.5, baseTgt.y, baseTgt.z);
   }
+
+  setView(v, instant = false) { this.viewTarget = v; if (instant) this.view = v; }
 
   addShake(a) { this.shake = Math.min(1.2, this.shake + a); }
   punch(a) { this.camPunch += a; }
